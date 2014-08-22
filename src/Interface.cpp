@@ -54,7 +54,7 @@ Interface::Interface(QWidget *parent):
 	Local::objects["Danmaku"]=danmaku;
 	Local::objects["APlayer"]=aplayer;
 
-	render=Render::instance(this);
+	render=Render::instance();
 	Local::objects["Render"]=render;
 
 	menu=new Menu(this);
@@ -81,7 +81,7 @@ Interface::Interface(QWidget *parent):
 			}
 		}
 	});
-	connect(delay,&QTimer::timeout,[this](){
+	connect(delay,&QTimer::timeout,APlayer::instance(),[this](){
 		if(aplayer->getState()==APlayer::Play&&!menu->isVisible()&&!info->isVisible()){
 			setCursor(QCursor(Qt::BlankCursor));
 		}
@@ -326,7 +326,8 @@ void Interface::closeEvent(QCloseEvent *e)
 		QString size=Config::getValue("/Interface/Size",QString("960,540"));
 		Config::setValue("/Interface/Size",size.endsWith(' ')?size.trimmed():QString("%1,%2").arg(width()).arg(height()));
 	}
-	danmaku->release();
+	delete aplayer;
+	delete danmaku;
 	if(!update.isNull()){
 		update->abort();
 	}
@@ -350,7 +351,7 @@ void Interface::dragEnterEvent(QDragEnterEvent *e)
 
 void Interface::resizeEvent(QResizeEvent *e)
 {
-	render->getWidget()->resize(e->size());
+	render->resize(e->size());
 	int w=e->size().width(),h=e->size().height();
 	menu->terminate();
 	info->terminate();

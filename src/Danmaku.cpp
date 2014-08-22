@@ -27,13 +27,15 @@
 #include "Danmaku.h"
 #include "APlayer.h"
 #include "Config.h"
-#include "Editor.h"
 #include "Graphic.h"
 #include "Load.h"
-#include "Local.h"
 #include "Render.h"
 #include "Shield.h"
 #include <functional>
+#ifndef EMBEDDED
+#include "Editor.h"
+#include "Local.h"
+#endif
 
 #define qThreadPool QThreadPool::globalInstance()
 
@@ -41,7 +43,7 @@ Danmaku *Danmaku::ins=NULL;
 
 Danmaku *Danmaku::instance()
 {
-	return ins?ins:new Danmaku(Local::mainWidget());
+	return ins?ins:new Danmaku(qApp);
 }
 
 Danmaku::Danmaku(QObject *parent):
@@ -55,10 +57,17 @@ Danmaku::Danmaku(QObject *parent):
 	connect(APlayer::instance(),&APlayer::timeChanged,this,&Danmaku::setTime   );
 }
 
+Danmaku::~Danmaku()
+{
+	qThreadPool->clear();
+	qThreadPool->waitForDone();
+}
+
 void Danmaku::draw(QPainter *painter,qint64 move)
 {
 	QVector<Graphic *> dirty;
 	lock.lockForWrite();
+	dirty.reserve(current.size());
 	for(auto iter=current.begin();iter!=current.end();){
 		Graphic *g=*iter;
 		if(g->move(move)){
@@ -192,12 +201,6 @@ const Comment *Danmaku::commentAt(QPoint point) const
 	}
 	lock.unlock();
 	return NULL;
-}
-
-void Danmaku::release()
-{
-	disconnect(APlayer::instance(),&APlayer::timeChanged,this,&Danmaku::setTime);
-	clearCurrent();
 }
 
 void Danmaku::resetTime()
@@ -347,7 +350,7 @@ public:
 		if(wait.isEmpty()||createTime<QDateTime::currentMSecsSinceEpoch()-500){
 			return;
 		}
-		QSize size=Render::instance()->getWidget()->size();
+		QSize size=Render::instance()->getActualSize();
 		QList<Graphic *> ready;
 		while(!wait.isEmpty()){
 			const Comment *c=wait.takeFirst();
@@ -599,9 +602,11 @@ void Danmaku::appendToPool(const Record &record)
 		append->full=true;
 	}
 	parse(0x1|0x2);
+#ifndef EMBEDDED
 	if(!exists&&Load::instance()->empty()&&pool.size()>=2){
 		Editor::exec(Local::mainWidget());
 	}
+#endif
 }
 
 bool Danmaku::appendToPool(QString source,const Comment &comment)
